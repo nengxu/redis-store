@@ -124,6 +124,18 @@ module ::RedisStore
           nil
         end
 
+        ##
+        # Implement the ActiveSupport::Cache#delete_entry
+        #
+        # It's really needed and use
+        #
+        def delete_entry(key, options)
+          @data.del key
+        rescue Errno::ECONNREFUSED => e
+          false
+        end
+
+
         # Add the namespace defined in the options to a pattern designed to match keys.
         #
         # This implementation is __different__ than ActiveSupport:
@@ -158,7 +170,14 @@ module ActiveSupport
       #   cache.read_multi "rabbit", "white-rabbit"
       #   cache.read_multi "rabbit", "white-rabbit", :raw => true
       def read_multi(*names)
-        @data.mget *names
+        values = @data.mget(*names)
+        
+        # Remove the options hash before mapping keys to values
+        names.extract_options!
+        
+        result = Hash[names.zip(values)]
+        result.reject!{ |k,v| v.nil? }
+        result
       end
 
       # Increment a key in the store.

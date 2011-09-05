@@ -3,6 +3,7 @@
 *.swp
 *.gem
 *-redis-store.gemspec
+tags
 bin/
 coverage/
 pkg/
@@ -10,3 +11,4 @@ vendor/
 tmp/
 .idea
 .bundle/
+Gemfile.lock
