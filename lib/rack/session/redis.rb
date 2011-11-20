@@ -28,7 +28,6 @@ module Rack
           ret = @pool.set sid, session
           raise "Session collision on '#{sid.inspect}'" unless ret
         end
-        session.instance_variable_set('@old', {}.merge(session))
         return [sid, session]
       rescue Errno::ECONNREFUSED
         warn "#{self} is unable to find server."
@@ -40,16 +39,12 @@ module Rack
 
       def set_session(env, session_id, new_session, options)
         @mutex.lock if env['rack.multithread']
-        session = @pool.get(session_id) rescue {}
         if options[:renew] or options[:drop]
           @pool.del session_id
           return false if options[:drop]
           session_id = generate_sid
-          @pool.set session_id, 0
         end
-        old_session = new_session.instance_variable_get('@old') || {}
-        session = merge_sessions session_id, old_session, new_session, session
-        @pool.set session_id, session, options
+        @pool.set session_id, new_session, options
         return session_id
       rescue Errno::ECONNREFUSED
         warn "#{self} is unable to find server."
@@ -64,24 +59,6 @@ module Rack
         set_session(env, session_id, 0, options)
       end
 
-      private
-        def merge_sessions(sid, old, new, cur=nil)
-          cur ||= {}
-          unless Hash === old and Hash === new
-            warn 'Bad old or new sessions provided.'
-            return cur
-          end
-
-          delete = old.keys - new.keys
-          warn "//@#{sid}: dropping #{delete*','}" if $DEBUG and not delete.empty?
-          delete.each{|k| cur.delete k }
-
-          update = new.keys.select{|k| new[k] != old[k] }
-          warn "//@#{sid}: updating #{update*','}" if $DEBUG and not update.empty?
-          update.each{|k| cur[k] = new[k] }
-
-          cur
-        end
     end
   end
 end
