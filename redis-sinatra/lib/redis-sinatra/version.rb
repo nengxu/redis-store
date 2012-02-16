@@ -1,5 +1,5 @@
-module Redis
+class Redis
   module Sinatra
-    VERSION = "0.0.0"
+    VERSION = '1.3.1'
   end
 end

@@ -1,11 +1,5 @@
 source "http://rubygems.org"
 gemspec
 
-group :test do
-  if RUBY_VERSION > '1.9'
-    gem 'ruby-debug19'
-  else
-    gem 'ruby-debug'
-  end
-end
-
+gem 'redis-store', '1.1.0', :path => File.expand_path('../../redis-store', __FILE__)
+gem 'SystemTimer', :platform => :mri_18

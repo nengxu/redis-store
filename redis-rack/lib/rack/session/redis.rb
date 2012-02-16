@@ -1,5 +1,6 @@
 require 'rack/session/abstract/id'
 require 'redis-store'
+require 'thread'
 
 module Rack
   module Session
@@ -7,21 +8,19 @@ module Rack
       attr_reader :mutex, :pool
 
       DEFAULT_OPTIONS = Abstract::ID::DEFAULT_OPTIONS.merge \
-        :namespace    => 'rack:session',
-        :redis_server => 'redis://127.0.0.1:6379/0'
+        :redis_server => 'redis://127.0.0.1:6379/0/rack:session'
 
       def initialize(app, options = {})
         super
 
         @mutex = Mutex.new
-        options[:redis_server] ||= @default_options[:redis_server]
-        @pool = ::Redis::Factory.create options
+        @pool = ::Redis::Factory.create @default_options[:redis_server]
       end
 
       def generate_sid
         loop do
           sid = super
-          break sid unless @pool.get(sid, true) # <=== WTF? <tt>true</tt>
+          break sid unless @pool.get(sid)
         end
       end
 
@@ -38,18 +37,15 @@ module Rack
       end
 
       def set_session(env, session_id, new_session, options)
-        expiry = options[:expire_after]
-        expiry = expiry.nil? ? 0 : expiry + 1
-
         with_lock(env, false) do
-          @pool.set session_id, expiry, new_session
+          @pool.set session_id, new_session, options
           session_id
         end
       end
 
       def destroy_session(env, session_id, options)
         with_lock(env) do
-          @pool.delete(session_id)
+          @pool.del(session_id)
           generate_sid unless options[:drop]
         end
       end

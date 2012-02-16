@@ -12,3 +12,4 @@ tmp/
 .idea
 .bundle/
 Gemfile.lock
+.rvmrc

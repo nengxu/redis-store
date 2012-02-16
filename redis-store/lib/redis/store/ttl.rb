@@ -3,7 +3,7 @@ class Redis
     module Ttl
       def set(key, value, options = nil)
         if ttl = expires_in(options)
-          setex(key, ttl, value)
+          setex(key, ttl.to_i, value, :raw => true)
         else
           super(key, value)
         end
@@ -11,7 +11,7 @@ class Redis
 
       def setnx(key, value, options = nil)
         if ttl = expires_in(options)
-          setnx_with_expire(key, value, ttl)
+          setnx_with_expire(key, value, ttl.to_i)
         else
           super(key, value)
         end
@@ -20,8 +20,8 @@ class Redis
       protected
         def setnx_with_expire(key, value, ttl)
           multi do
-            setnx(key, value)
-            expire(key, expires_in)
+            setnx(key, value, :raw => true)
+            expire(key, ttl)
           end
         end
 

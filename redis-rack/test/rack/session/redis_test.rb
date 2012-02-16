@@ -23,18 +23,28 @@ describe Rack::Session::Redis do
     incrementor.call(env)
   end
 
-  # test Redis connection
-  Rack::Session::Redis.new(incrementor)
+  # # test Redis connection
+  # Rack::Session::Redis.new(incrementor)
+  #
+  # it "faults on no connection" do
+  #   lambda{
+  #     Rack::Session::Redis.new(incrementor, :redis_server => 'nosuchserver')
+  #   }.must_raise(Exception)
+  # end
 
-  it "faults on no connection" do
-    lambda{
-      Rack::Session::Redis.new(incrementor, :redis_server => 'nosuchserver')
-    }.must_raise(Exception)
+  it "uses the default Redis server and namespace when not provided" do
+    pool = Rack::Session::Redis.new(incrementor)
+    pool.pool.to_s.must_match(/127\.0\.0\.1:6379 against DB 0 with namespace rack:session$/)
   end
 
-  it "passes options to Redis" do
-    pool = Rack::Session::Redis.new(incrementor, :namespace => 'test:rack:session')
-    pool.pool.to_s.must_match('namespace test:rack:session')
+  it "uses the specified namespace when provided" do
+    pool = Rack::Session::Redis.new(incrementor, :redis_server => {:namespace => 'test:rack:session'})
+    pool.pool.to_s.must_match(/namespace test:rack:session$/)
+  end
+
+  it "uses the specified Redis server when provided" do
+    pool = Rack::Session::Redis.new(incrementor, :redis_server => 'redis://127.0.0.1:6380/1')
+    pool.pool.to_s.must_match(/127\.0\.0\.1:6380 against DB 1$/)
   end
 
   it "creates a new cookie" do
@@ -92,13 +102,14 @@ describe Rack::Session::Redis do
     res = Rack::MockRequest.new(pool).get('/')
     res.body.must_include('"counter"=>1')
     cookie = res["Set-Cookie"]
+    sid = cookie[session_match, 1]
     res = Rack::MockRequest.new(pool).get('/', "HTTP_COOKIE" => cookie)
-    res["Set-Cookie"].must_equal(cookie)
+    res["Set-Cookie"][session_match, 1].must_equal(sid)
     res.body.must_include('"counter"=>2')
     puts 'Sleeping to expire session' if $DEBUG
     sleep 4
     res = Rack::MockRequest.new(pool).get('/', "HTTP_COOKIE" => cookie)
-    res["Set-Cookie"].wont_equal(cookie)
+    res["Set-Cookie"][session_match, 1].wont_equal(sid)
     res.body.must_include('"counter"=>1')
   end
 
@@ -107,7 +118,7 @@ describe Rack::Session::Redis do
     req = Rack::MockRequest.new(pool)
 
     res0 = req.get("/")
-    cookie = res0["Set-Cookie"][session_match]
+    cookie = res0["Set-Cookie"]
     res0.body.must_equal('{"counter"=>1}')
 
     res1 = req.get("/", "HTTP_COOKIE" => cookie)
@@ -188,10 +199,10 @@ describe Rack::Session::Redis do
 
     res0 = req.get("/")
     session_id = (cookie = res0["Set-Cookie"])[session_match, 1]
-    ses0 = pool.pool.get(session_id, true)
+    ses0 = pool.pool.get(session_id)
 
     req.get("/", "HTTP_COOKIE" => cookie)
-    ses1 = pool.pool.get(session_id, true)
+    ses1 = pool.pool.get(session_id)
 
     ses1.wont_equal(ses0)
   end
